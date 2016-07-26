@@ -158,7 +158,9 @@ public class ServerHardwareClientImpl implements ServerHardwareClient {
         }
 
         params.setType(HttpMethodType.GET);
-        params.setUrl(UrlUtils.createRestUrl(params.getHostname(), ResourceUris.SERVER_HARDWARE_URI));
+        params.setUrl(UrlUtils.createRestUrl(
+                 params.getHostname(),
+                 ResourceUris.SERVER_HARDWARE_URI+"?count="+String.valueOf(Integer.MAX_VALUE)));
 
         String returnObj = restClient.sendRequest(params);
         LOGGER.debug("ServerHardwareClientImpl : getAllServerHardware : response from OV : " + returnObj);

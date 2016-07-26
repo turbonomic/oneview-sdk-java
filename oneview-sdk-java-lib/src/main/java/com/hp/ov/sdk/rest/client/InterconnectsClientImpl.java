@@ -123,7 +123,7 @@ public class InterconnectsClientImpl implements InterconnectsClient {
         params.setType(HttpMethodType.GET);
         params.setUrl(UrlUtils.createRestUrl(
                 params.getHostname(),
-                ResourceUris.INTERCONNECT_URI));
+                ResourceUris.INTERCONNECT_URI+"?count="+String.valueOf(Integer.MAX_VALUE)));
 
         // call rest client
         final String returnObj = httpClient.sendRequest(params);
