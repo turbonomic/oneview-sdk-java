@@ -114,9 +114,7 @@ public class StorageVolumeClientImpl implements StorageVolumeClient {
         }
         // set the additional params
         params.setType(HttpMethodType.GET);
-        params.setUrl(UrlUtils.createRestUrl(
-                 params.getHostname(),
-                 ResourceUris.STORAGE_VOLUME_URI+"?count="+String.valueOf(Integer.MAX_VALUE)));
+        params.setUrl(UrlUtils.createRestUrl(params.getHostname(), ResourceUris.STORAGE_VOLUME_URI));
 
         final String returnObj = restClient.sendRequest(params);
         LOGGER.debug("StorageVolumeClientImpl : getAllStorageVolumes : response from OV : " + returnObj);

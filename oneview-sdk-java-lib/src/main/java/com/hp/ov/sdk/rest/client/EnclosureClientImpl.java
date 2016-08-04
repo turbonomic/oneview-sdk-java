@@ -122,9 +122,7 @@ public class EnclosureClientImpl implements EnclosureClient {
         }
         // set the additional params
         params.setType(HttpMethodType.GET);
-        params.setUrl(UrlUtils.createRestUrl(
-                 params.getHostname(),
-                 ResourceUris.ENCLOSURE_URI+"?count="+String.valueOf(Integer.MAX_VALUE)));
+        params.setUrl(UrlUtils.createRestUrl(params.getHostname(), ResourceUris.ENCLOSURE_URI));
 
         // call rest client
         final String returnObj = httpClient.sendRequest(params);
