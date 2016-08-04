@@ -115,27 +115,53 @@ public class InterconnectsClientImpl implements InterconnectsClient {
     @Override
     public ResourceCollection<Interconnects> getAllInterconnects(final RestParams params) {
         LOGGER.info("InterconnectsClientImpl : getAllInterconnects : Start");
-        // validate args
+        // validate pargms
         if (null == params) {
             throw new SDKInvalidArgumentException(SDKErrorEnum.invalidArgument, null, null, null, SdkConstants.APPLIANCE, null);
         }
+        boolean nextPage = true;
+        String getNextPageUri = null;
+        int totalCount = 0;
+        ResourceCollection<Interconnects> interconnectsCollectionDto = new ResourceCollection<Interconnects>();
         // set the additional params
         params.setType(HttpMethodType.GET);
-        params.setUrl(UrlUtils.createRestUrl(
-                params.getHostname(),
-                ResourceUris.INTERCONNECT_URI));
+        while (nextPage) {
+            if (getNextPageUri != null) {
+                params.setUrl(UrlUtils.createRestUrl(
+                                                     params.getHostname(),
+                                                     getNextPageUri));
+            } else {
+                params.setUrl(UrlUtils.createRestUrl(
+                                                     params.getHostname(),
+                                                     ResourceUris.INTERCONNECT_URI));
+            }
+            // call rest client
+            final String returnObj = httpClient.sendRequest(params);
+            LOGGER.debug("InterconnectsClientImpl : getAllInterconnects : response from OV :" + returnObj);
 
-        // call rest client
-        final String returnObj = httpClient.sendRequest(params);
-        LOGGER.debug("InterconnectsClientImpl : getAllInterconnects : response from OV :" + returnObj);
+            if (null == returnObj || returnObj.equals("")) {
+                throw new SDKNoResponseException(SDKErrorEnum.noResponseFromAppliance, null, null, null, SdkConstants.INTERCONNECT,
+                        null);
+            }
 
-        if (null == returnObj || returnObj.equals("")) {
-            throw new SDKNoResponseException(SDKErrorEnum.noResponseFromAppliance, null, null, null, SdkConstants.INTERCONNECT,
-                    null);
+            // Call adaptor to convert to DTO
+            ResourceCollection<Interconnects> newICDto
+                    = resourceAdaptor.buildResourceCollection(returnObj, Interconnects.class);
+            totalCount =+ newICDto.getCount();
+            if (newICDto.getNextPageUri() != null) {
+                List<Interconnects> icDto = interconnectsCollectionDto.getMembers();
+                List<Interconnects> newDto = newICDto.getMembers();
+                icDto.addAll(newDto); interconnectsCollectionDto.setMembers(icDto);
+                getNextPageUri = newICDto.getNextPageUri();
+            } else {
+                List<Interconnects> icDto = interconnectsCollectionDto.getMembers();
+                interconnectsCollectionDto = newICDto;
+                List<Interconnects> newDto = newICDto.getMembers();
+                icDto.addAll(newDto); interconnectsCollectionDto.setMembers(icDto);
+                nextPage = false;
+                interconnectsCollectionDto.setCount(totalCount);
+            }
         }
-
-        ResourceCollection<Interconnects> interconnectsCollectionDto
-                = resourceAdaptor.buildResourceCollection(returnObj, Interconnects.class);
 
         LOGGER.debug("InterconnectsClientImpl : getAllInterconnects : members count :" + interconnectsCollectionDto.getCount());
         LOGGER.info("InterconnectsClientImpl : getAllInterconnects : End");

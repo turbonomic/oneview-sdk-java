@@ -16,6 +16,7 @@
 package com.hp.ov.sdk.rest.client;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.json.JSONObject;
@@ -151,25 +152,52 @@ public class ServerHardwareClientImpl implements ServerHardwareClient {
     @Override
     public ResourceCollection<ServerHardware> getAllServerHardware(final RestParams params) {
         LOGGER.trace("ServerHardwareClientImpl : getAllServerHardware : Start");
-
+        // validate pargms
         if (null == params) {
             throw new SDKInvalidArgumentException(SDKErrorEnum.invalidArgument, null, null, null,
                     SdkConstants.APPLIANCE, null);
         }
-
+        boolean nextPage = true;
+        String getNextPageUri = null;
+        int totalCount = 0;
+        ResourceCollection<ServerHardware> serverHardwareCollectionDto = new ResourceCollection<ServerHardware>();
         params.setType(HttpMethodType.GET);
-        params.setUrl(UrlUtils.createRestUrl(params.getHostname(), ResourceUris.SERVER_HARDWARE_URI));
+        while (nextPage) {
+            if (getNextPageUri != null) {
+                params.setUrl(UrlUtils.createRestUrl(
+                                                     params.getHostname(),
+                                                     getNextPageUri));
+            } else {
+                params.setUrl(UrlUtils.createRestUrl(
+                         params.getHostname(),
+                         ResourceUris.SERVER_HARDWARE_URI));
+            }
+            String returnObj = restClient.sendRequest(params);
+            LOGGER.debug("ServerHardwareClientImpl : getAllServerHardware : response from OV : " + returnObj);
 
-        String returnObj = restClient.sendRequest(params);
-        LOGGER.debug("ServerHardwareClientImpl : getAllServerHardware : response from OV : " + returnObj);
+            if (Strings.isNullOrEmpty(returnObj)) {
+                throw new SDKNoResponseException(SDKErrorEnum.noResponseFromAppliance, null, null, null,
+                        SdkConstants.SERVER_HARDWARES, null);
+            }
 
-        if (Strings.isNullOrEmpty(returnObj)) {
-            throw new SDKNoResponseException(SDKErrorEnum.noResponseFromAppliance, null, null, null,
-                    SdkConstants.SERVER_HARDWARES, null);
+            // Call adaptor to convert to DTO
+            ResourceCollection<ServerHardware> newSHCDto = adaptor.buildResourceCollection(returnObj,
+                    ServerHardware.class);
+            totalCount =+ newSHCDto.getCount();
+            if (newSHCDto.getNextPageUri() != null) {
+                List<ServerHardware> shcDto = serverHardwareCollectionDto.getMembers();
+                List<ServerHardware> newDto = newSHCDto.getMembers();
+                shcDto.addAll(newDto); serverHardwareCollectionDto.setMembers(shcDto);
+                getNextPageUri = newSHCDto.getNextPageUri();
+            } else {
+                List<ServerHardware> shcDto = serverHardwareCollectionDto.getMembers();
+                serverHardwareCollectionDto = newSHCDto;
+                List<ServerHardware> newDto = newSHCDto.getMembers();
+                shcDto.addAll(newDto); serverHardwareCollectionDto.setMembers(shcDto);
+                nextPage = false;
+                serverHardwareCollectionDto.setCount(totalCount);
+            }
         }
-
-        ResourceCollection<ServerHardware> serverHardwareCollectionDto = adaptor.buildResourceCollection(returnObj,
-                ServerHardware.class);
 
         LOGGER.debug("ServerHardwareClientImpl : getAllServerHardware : members count : "
                 + serverHardwareCollectionDto.getCount());

@@ -16,6 +16,7 @@
 package com.hp.ov.sdk.rest.client;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.json.JSONObject;
@@ -91,25 +92,52 @@ public class StoragePoolClientImpl implements StoragePoolClient {
     @Override
     public ResourceCollection<StoragePool> getAllStoragePools(final RestParams params) {
         LOGGER.trace("StoragePoolClientImpl : getAllStoragePools : Start");
-
-        // validate args
+        // validate pargms
         if (null == params) {
             throw new SDKInvalidArgumentException(SDKErrorEnum.invalidArgument, null, null, null, SdkConstants.APPLIANCE, null);
         }
+        boolean nextPage = true;
+        String getNextPageUri = null;
+        int totalCount = 0;
+        ResourceCollection<StoragePool> storagePoolCollectionDto = new ResourceCollection<StoragePool>();
         // set the additional params
         params.setType(HttpMethodType.GET);
-        params.setUrl(UrlUtils.createRestUrl(params.getHostname(), ResourceUris.STORAGE_POOL_URI));
+        while (nextPage) {
+            if (getNextPageUri != null) {
+                params.setUrl(UrlUtils.createRestUrl(
+                                                     params.getHostname(),
+                                                     getNextPageUri));
+            } else {
+                params.setUrl(UrlUtils.createRestUrl(
+                                                     params.getHostname(),
+                                                     ResourceUris.STORAGE_POOL_URI));
+            }
+            final String returnObj = restClient.sendRequest(params);
+            LOGGER.debug("StoragePoolClientImpl : getAllStoragePools : response from OV :" + returnObj);
 
-        final String returnObj = restClient.sendRequest(params);
-        LOGGER.debug("StoragePoolClientImpl : getAllStoragePools : response from OV :" + returnObj);
+            if (Strings.isNullOrEmpty(returnObj)) {
+                throw new SDKNoResponseException(SDKErrorEnum.noResponseFromAppliance, null, null, null,
+                        SdkConstants.STORAGE_POOL, null);
+            }
 
-        if (Strings.isNullOrEmpty(returnObj)) {
-            throw new SDKNoResponseException(SDKErrorEnum.noResponseFromAppliance, null, null, null,
-                    SdkConstants.STORAGE_POOL, null);
+            // Call adaptor to convert to DTO
+            ResourceCollection<StoragePool> newSPDto
+                    = resourceAdaptor.buildResourceCollection(returnObj, StoragePool.class);
+            totalCount =+ newSPDto.getCount();
+            if (newSPDto.getNextPageUri() != null) {
+                List<StoragePool> spDto = storagePoolCollectionDto.getMembers();
+                List<StoragePool> newDto = newSPDto.getMembers();
+                spDto.addAll(newDto); storagePoolCollectionDto.setMembers(spDto);
+                getNextPageUri = newSPDto.getNextPageUri();
+            } else {
+                List<StoragePool> spcDto = storagePoolCollectionDto.getMembers();
+                storagePoolCollectionDto = newSPDto;
+                List<StoragePool> newDto = newSPDto.getMembers();
+                newDto.addAll(spcDto); storagePoolCollectionDto.setMembers(newDto);
+                nextPage = false;
+                storagePoolCollectionDto.setCount(totalCount);
+            }
         }
-
-        ResourceCollection<StoragePool> storagePoolCollectionDto
-                = resourceAdaptor.buildResourceCollection(returnObj, StoragePool.class);
 
         LOGGER.debug("StoragePoolClientImpl : getAllStoragePools : count :" + storagePoolCollectionDto.getCount());
         LOGGER.trace("StoragePoolClientImpl : getAllStoragePools : End");

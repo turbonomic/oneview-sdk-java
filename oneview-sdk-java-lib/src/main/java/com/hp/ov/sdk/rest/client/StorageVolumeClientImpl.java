@@ -16,6 +16,7 @@
 package com.hp.ov.sdk.rest.client;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.json.JSONObject;
@@ -106,25 +107,52 @@ public class StorageVolumeClientImpl implements StorageVolumeClient {
     @Override
     public ResourceCollection<StorageVolumeV2> getAllStorageVolumes(final RestParams params) {
         LOGGER.trace("StorageVolumeClientImpl : getAllStorageVolumes : Start");
-
-        // validate args
+        // validate pargms
         if (null == params) {
             throw new SDKInvalidArgumentException(SDKErrorEnum.invalidArgument, null, null, null,
                     SdkConstants.APPLIANCE, null);
         }
+        boolean nextPage = true;
+        String getNextPageUri = null;
+        int totalCount = 0;
+        ResourceCollection<StorageVolumeV2> storageVolumeCollectionDto = new ResourceCollection<StorageVolumeV2>();
         // set the additional params
         params.setType(HttpMethodType.GET);
-        params.setUrl(UrlUtils.createRestUrl(params.getHostname(), ResourceUris.STORAGE_VOLUME_URI));
+        while (nextPage) {
+            if (getNextPageUri != null) {
+                params.setUrl(UrlUtils.createRestUrl(
+                                                     params.getHostname(),
+                                                     getNextPageUri));
+            } else {
+                params.setUrl(UrlUtils.createRestUrl(
+                                                     params.getHostname(),
+                                                     ResourceUris.STORAGE_VOLUME_URI));
+            }
+            final String returnObj = restClient.sendRequest(params);
+            LOGGER.debug("StorageVolumeClientImpl : getAllStorageVolumes : response from OV : " + returnObj);
+            if (Strings.isNullOrEmpty(returnObj)) {
+                throw new SDKNoResponseException(SDKErrorEnum.noResponseFromAppliance, null, null, null,
+                        SdkConstants.STORAGE_VOLUMES, null);
+            }
 
-        final String returnObj = restClient.sendRequest(params);
-        LOGGER.debug("StorageVolumeClientImpl : getAllStorageVolumes : response from OV : " + returnObj);
-        if (Strings.isNullOrEmpty(returnObj)) {
-            throw new SDKNoResponseException(SDKErrorEnum.noResponseFromAppliance, null, null, null,
-                    SdkConstants.STORAGE_VOLUMES, null);
+            // Call adaptor to convert to DTO
+            ResourceCollection<StorageVolumeV2> newSVDto = resourceAdaptor.buildResourceCollection(
+                    returnObj, StorageVolumeV2.class);
+            totalCount =+ newSVDto.getCount();
+            if (newSVDto.getNextPageUri() != null) {
+                List<StorageVolumeV2> svDto = storageVolumeCollectionDto.getMembers();
+                List<StorageVolumeV2> newDto = newSVDto.getMembers();
+                svDto.addAll(newDto); storageVolumeCollectionDto.setMembers(svDto);
+                getNextPageUri = newSVDto.getNextPageUri();
+            } else {
+                List<StorageVolumeV2> svDto = storageVolumeCollectionDto.getMembers();
+                storageVolumeCollectionDto = newSVDto;
+                List<StorageVolumeV2> newDto = newSVDto.getMembers();
+                newDto.addAll(svDto); storageVolumeCollectionDto.setMembers(newDto);
+                nextPage = false;
+                storageVolumeCollectionDto.setCount(totalCount);
+            }
         }
-
-        ResourceCollection<StorageVolumeV2> storageVolumeCollectionDto = resourceAdaptor.buildResourceCollection(
-                returnObj, StorageVolumeV2.class);
 
         LOGGER.debug("StorageVolumeClientImpl : getAllStorageVolumes : count : " + storageVolumeCollectionDto.getCount());
         LOGGER.trace("StorageVolumeClientImpl : getAllStorageVolumes : End");

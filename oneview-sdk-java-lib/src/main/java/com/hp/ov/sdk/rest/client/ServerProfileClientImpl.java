@@ -116,24 +116,51 @@ public class ServerProfileClientImpl implements ServerProfileClient {
     @Override
     public ResourceCollection<ServerProfile> getAllServerProfile(final RestParams params) {
         LOGGER.info("ServerProfileClientImpl : getAllServerProfile : Start");
-
-        // validate args
+        // validate pargms
         if (null == params) {
             throw new SDKInvalidArgumentException(SDKErrorEnum.invalidArgument, null, null, null, SdkConstants.APPLIANCE, null);
         }
+        boolean nextPage = true;
+        String getNextPageUri = null;
+        int totalCount = 0;
+        ResourceCollection<ServerProfile> serverProfileCollectionDto = new ResourceCollection<ServerProfile>();
         // set the additional params
         params.setType(HttpMethodType.GET);
-        params.setUrl(UrlUtils.createRestUrl(params.getHostname(), ResourceUris.SERVER_PROFILE_URI));
+        while (nextPage) {
+            if (getNextPageUri != null) {
+                params.setUrl(UrlUtils.createRestUrl(
+                                                     params.getHostname(),
+                                                     getNextPageUri));
+            } else {
+                params.setUrl(UrlUtils.createRestUrl(
+                                                     params.getHostname(),
+                                                     ResourceUris.SERVER_PROFILE_URI));
+            }
+            final String returnObj = httpClient.sendRequest(params);
+            LOGGER.debug("ServerProfileClientImpl : getAllServerProfile : response from OV :" + returnObj);
+            if (null == returnObj || returnObj.equals("")) {
+                throw new SDKNoResponseException(SDKErrorEnum.noResponseFromAppliance, null, null, null, SdkConstants.SERVER_PROFILES,
+                        null);
+            }
 
-        final String returnObj = httpClient.sendRequest(params);
-        LOGGER.debug("ServerProfileClientImpl : getAllServerProfile : response from OV :" + returnObj);
-        if (null == returnObj || returnObj.equals("")) {
-            throw new SDKNoResponseException(SDKErrorEnum.noResponseFromAppliance, null, null, null, SdkConstants.SERVER_PROFILES,
-                    null);
+            // Call adaptor to convert to DTO
+            ResourceCollection<ServerProfile> newSPCDto
+                    = resourceAdaptor.buildResourceCollection(returnObj, ServerProfile.class);
+            totalCount =+ newSPCDto.getCount();
+            if (newSPCDto.getNextPageUri() != null) {
+                List<ServerProfile> spcDto = serverProfileCollectionDto.getMembers();
+                List<ServerProfile> newDto = newSPCDto.getMembers();
+                spcDto.addAll(newDto); serverProfileCollectionDto.setMembers(spcDto);
+                getNextPageUri = newSPCDto.getNextPageUri();
+            } else {
+                List<ServerProfile> spcDto = serverProfileCollectionDto.getMembers();
+                serverProfileCollectionDto = newSPCDto;
+                List<ServerProfile> newDto = newSPCDto.getMembers();
+                spcDto.addAll(newDto); serverProfileCollectionDto.setMembers(spcDto);
+                nextPage = false;
+                serverProfileCollectionDto.setCount(totalCount);
+            }
         }
-
-        ResourceCollection<ServerProfile> serverProfileCollectionDto
-                = resourceAdaptor.buildResourceCollection(returnObj, ServerProfile.class);
 
         LOGGER.debug("ServerProfileClientImpl : getAllServerProfile : Count :" + serverProfileCollectionDto.getCount());
         LOGGER.info("ServerProfileClientImpl : getAllServerProfile : End");

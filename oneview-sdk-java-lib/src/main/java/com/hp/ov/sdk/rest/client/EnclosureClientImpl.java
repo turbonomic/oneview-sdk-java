@@ -16,6 +16,7 @@
 package com.hp.ov.sdk.rest.client;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.json.JSONArray;
@@ -116,25 +117,52 @@ public class EnclosureClientImpl implements EnclosureClient {
     @Override
     public ResourceCollection<Enclosures> getAllEnclosures(final RestParams params) {
         LOGGER.info("EnclosureClientImpl : getAllEnclosureV2s : Start");
-        // validate args
+        // validate pargms
         if (null == params) {
             throw new SDKInvalidArgumentException(SDKErrorEnum.invalidArgument, null, null, null, SdkConstants.APPLIANCE, null);
         }
+        boolean nextPage = true;
+        String getNextPageUri = null;
+        int totalCount = 0;
+        ResourceCollection<Enclosures> enclosureCollectionDto = new ResourceCollection<Enclosures>();
         // set the additional params
         params.setType(HttpMethodType.GET);
-        params.setUrl(UrlUtils.createRestUrl(params.getHostname(), ResourceUris.ENCLOSURE_URI));
+        while (nextPage) {
+            if (getNextPageUri != null) {
+                params.setUrl(UrlUtils.createRestUrl(
+                                                     params.getHostname(),
+                                                     getNextPageUri));
+            } else {
+                params.setUrl(UrlUtils.createRestUrl(
+                                                     params.getHostname(),
+                                                     ResourceUris.ENCLOSURE_URI));
+            }
+            // call rest client
+            final String returnObj = httpClient.sendRequest(params);
+            LOGGER.debug("EnclosureClientImpl : getAllEnclosureV2s : response from OV :" + returnObj);
 
-        // call rest client
-        final String returnObj = httpClient.sendRequest(params);
-        LOGGER.debug("EnclosureClientImpl : getAllEnclosureV2s : response from OV :" + returnObj);
+            if (null == returnObj || returnObj.equals("")) {
+                throw new SDKNoResponseException(SDKErrorEnum.noResponseFromAppliance, null, null, null, SdkConstants.ENCLOSURE, null);
+            }
 
-        if (null == returnObj || returnObj.equals("")) {
-            throw new SDKNoResponseException(SDKErrorEnum.noResponseFromAppliance, null, null, null, SdkConstants.ENCLOSURE, null);
+            // Call adaptor to convert to DTO
+            ResourceCollection<Enclosures> newECDto
+                    = resourceAdaptor.buildResourceCollection(returnObj, Enclosures.class);
+            totalCount =+ newECDto.getCount();
+            if (newECDto.getNextPageUri() != null) {
+                List<Enclosures> ecDto = enclosureCollectionDto.getMembers();
+                List<Enclosures> newDto = newECDto.getMembers();
+                ecDto.addAll(newDto); enclosureCollectionDto.setMembers(ecDto);
+                getNextPageUri = newECDto.getNextPageUri();
+            } else {
+                List<Enclosures> ecDto = enclosureCollectionDto.getMembers();
+                enclosureCollectionDto = newECDto;
+                List<Enclosures> newDto = newECDto.getMembers();
+                ecDto.addAll(newDto); enclosureCollectionDto.setMembers(ecDto);
+                nextPage = false;
+                enclosureCollectionDto.setCount(totalCount);
+            }
         }
-        // Call adaptor to convert to DTO
-
-        ResourceCollection<Enclosures> enclosureCollectionDto
-                = resourceAdaptor.buildResourceCollection(returnObj, Enclosures.class);
 
         LOGGER.debug("EnclosureV2Client : getAllEnclosureV2s : members count :" + enclosureCollectionDto.getCount());
         LOGGER.info("EnclosureClientImpl : getAllEnclosureV2s : End");
